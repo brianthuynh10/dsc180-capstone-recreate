@@ -1,0 +1,13 @@
+# Ignore Docker image outputs
+*.tar
+*.sif
+
+# Ignore system/cache files
+__pycache__/
+.ipynb_checkpoints/
+.DS_Store
+
+# Ignore large datasets
+data/
+models/
+outputs/
