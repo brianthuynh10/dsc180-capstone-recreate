@@ -1,14 +1,13 @@
-import argparse
-from src.clean_data import clean_main
-from src.train import Trainer
+from src import clean, Trainer
 
 def main(): 
      # -- Pull Data -- 
-    train, val, test = clean_main() # XRayDataset objects
+    print('Beginning Data Cleaning')
+    train, val, test = clean() # XRayDataset objects
 
     # -- Train Model (using papers setup) -- 
-    trainer = Trainer(epochs=50, lr=1e-5, batch_size=16)
-    trainer.create_dataloaders(train, val, test)
+    print('Model created & training will start now')
+    trainer = Trainer(epochs=50, lr=1e-5, batch_size=16, train_dataset = train, val_dataset = val, test_dataset = test)
     trainer.train()
 
     # -- Evaluate Model --

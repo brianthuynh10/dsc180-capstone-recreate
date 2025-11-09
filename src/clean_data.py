@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import h5py
 from torchvision import transforms
-from XRayDataset import XRayDataset
+from src.XRayDataset import XRayDataset
 import os 
 
 def grab_keys(path, lst): 
@@ -50,7 +50,7 @@ def add_image_data_df(df, file_paths):
 
     return df
 
-def clean_main():
+def main():
     """ Cleans the data and returns train, val, test datasets """
     # HDF5 Paths:
     home_dir = os.path.expanduser("~")
@@ -114,4 +114,4 @@ def clean_main():
     return train_dataset, val_dataset, test_dataset
 
 if __name__ == "__main__":
-    clean_main()
+    main()

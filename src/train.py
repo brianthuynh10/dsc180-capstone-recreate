@@ -3,7 +3,7 @@ import torch
 from torch import nn, optim
 from torch.utils.data import DataLoader
 from src.clean_data import main as clean_main
-from src.model import create_model
+from src.model import make_vgg16_model as create_model
 from tqdm import tqdm
 from scipy.stats import pearsonr
 import matplotlib.pyplot as plt
@@ -20,20 +20,30 @@ class Trainer:
         project="vgg16-xray-regression",
         run_name=None,
         device=None,
-    ):
+        train_dataset=None,
+        val_dataset=None,
+        test_dataset=None,
+        ):
         """Initialize trainer, model, optimizer, and wandb run."""
         self.epochs = epochs
         self.lr = lr
         self.batch_size = batch_size
         self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        
 
         print(f"🖥️ Using device: {self.device}")
         print(f"📦 Hyperparameters | Epochs: {self.epochs}, LR: {self.lr}, Batch Size: {self.batch_size}")
 
-        # --- Initialize model, loss, and optimizer ---
-        self.model = create_model().to(self.device)
-        self.criterion = nn.L1Loss()  # MAE loss
-        self.optimizer = optim.Adam(self.model.classifier.parameters(), lr=self.lr)
+        """Initialize trainer, model, optimizer, and wandb run."""
+        self.model = create_model()
+        self.optimizer = torch.optim.Adam(model.parameters(), lr=1e-5)
+        self.epochs = epochs
+        self.lr = lr
+        self.batch_size = batch_size
+        self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.train_dataset = train_dataset
+        self.val_dataset = val_dataset
+        self.test_dataset = test_dataset
         self.best_val_loss = float("inf")
 
         # --- Create output directory ---
@@ -49,17 +59,16 @@ class Trainer:
         })
         wandb.watch(self.model, log="all", log_freq=100)
 
-    def load_data(self):
+    def create_dataloaders(self):
         """Load cleaned data and create dataloaders."""
-        print("📦 Loading datasets...")
-        train_dataset, val_dataset, test_dataset = clean_main()
-        self.train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=4)
-        self.val_loader = DataLoader(val_dataset, batch_size=self.batch_size, shuffle=False, num_workers=4)
-        self.test_loader = DataLoader(test_dataset, batch_size=self.batch_size, shuffle=False, num_workers=4)
+        print("📦 Creating Data Loaders...")
+        self.train_loader = DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=4)
+        self.val_loader = DataLoader(self.val_dataset, batch_size=self.batch_size, shuffle=False, num_workers=4)
+        self.test_loader = DataLoader(self.test_dataset, batch_size=self.batch_size, shuffle=False, num_workers=4)
 
     def train(self):
         """Main training loop."""
-        self.load_data()
+        self.create_dataloaders()
         print("Beginning training...")
 
         for epoch in range(self.epochs):
@@ -133,13 +142,14 @@ class Trainer:
         return avg_val_loss, val_r, fig
 
     def evaluate(self):
-        """Evaluate best model on test set."""
+        """Evaluate best model on test set and log results + scatter plot."""
         print("🔍 Evaluating best model on test set...")
         self.model.load_state_dict(torch.load("outputs/best_model.pt", map_location=self.device))
         self.model.eval()
-
+    
         test_loss_total = 0.0
         all_preds, all_labels = [], []
+    
         with torch.no_grad():
             for images, labels in self.test_loader:
                 images, labels = images.to(self.device), labels.to(self.device)
@@ -147,12 +157,29 @@ class Trainer:
                 test_loss_total += self.criterion(outputs, labels.view(-1, 1)).item()
                 all_preds.append(outputs.cpu())
                 all_labels.append(labels.cpu())
-
+    
         avg_test_loss = test_loss_total / len(self.test_loader)
         test_r = self._pearson_corr(all_preds, all_labels)
-        wandb.log({"test_mae": avg_test_loss, "test_r": test_r})
+    
+        # --- Create scatter plot ---
+        fig, ax = plt.subplots()
+        ax.scatter(torch.cat(all_labels).numpy(), torch.cat(all_preds).numpy(), alpha=0.5)
+        ax.set_xlabel("True BNP (log)")
+        ax.set_ylabel("Predicted BNP (log)")
+        ax.set_title(f"Test Set: MAE={avg_test_loss:.4f}, r={test_r:.4f}")
+        plt.savefig("outputs/test_scatter.png")
+    
+        # --- Log to W&B ---
+        wandb.log({
+            "test_mae": avg_test_loss,
+            "test_r": test_r,
+            "test_scatter": wandb.Image(fig)
+        })
+        plt.close(fig)
+    
         print(f"Test MAE: {avg_test_loss:.4f} | 🔗 Test r: {test_r:.4f}")
         return avg_test_loss, test_r
+
 
     def _pearson_corr(self, preds, labels):
         preds = torch.cat(preds).numpy()
