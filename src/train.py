@@ -7,8 +7,12 @@ from src.model import make_vgg16_model as create_model
 from tqdm import tqdm
 from scipy.stats import pearsonr
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 import wandb
 import os
+import numpy as np
+from sklearn.linear_model import LinearRegression
+
 
 
 class Trainer:
@@ -40,11 +44,9 @@ class Trainer:
         self.run_name = run_name
         
 
-        print(f"🖥️ Using device: {self.device}")
-        print(f"📦 Hyperparameters | Epochs: {self.epochs}, LR: {self.lr}, Batch Size: {self.batch_size}")
+        print(f"Using device: {self.device}")
+        print(f"Hyperparameters | Epochs: {self.epochs}, LR: {self.lr}, Batch Size: {self.batch_size}")
 
-        
-        
         # Move model to gpu:
         self.model.to(self.device)
 
@@ -63,7 +65,7 @@ class Trainer:
 
     def create_dataloaders(self):
         """Load cleaned data and create dataloaders."""
-        print("📦 Creating Data Loaders...")
+        print("Creating Data Loaders...")
         self.train_loader = DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=4)
         self.val_loader = DataLoader(self.val_dataset, batch_size=self.batch_size, shuffle=False, num_workers=4)
         self.test_loader = DataLoader(self.test_dataset, batch_size=self.batch_size, shuffle=False, num_workers=4)
@@ -113,7 +115,7 @@ class Trainer:
                   f"Val MAE: {avg_val_loss:.4f} | Val r: {val_r:.4f}")
 
         wandb.finish()
-        print("✅ Training complete.")
+        print("Training complete.")
 
     def validate(self, epoch):
         """Run validation and save scatter plot."""
@@ -129,26 +131,61 @@ class Trainer:
                 all_preds.append(outputs.cpu())
                 all_labels.append(labels.cpu())
 
+        # Convert back to BNPP value, not log
         avg_val_loss = val_loss_total / len(self.val_loader)
         val_r = self._pearson_corr(all_preds, all_labels)
+        preds_log = torch.cat(all_preds).numpy().flatten()
+        labels_log = torch.cat(all_labels).numpy().flatten()
 
-        # --- Create scatter plot ---
+        preds_real = (10 ** preds_log)
+        labels_real = (10 ** labels_log)
+
+        # --- Create scatter plot in original BNP scale ---
         fig, ax = plt.subplots()
-        ax.scatter(torch.cat(all_labels).numpy(), torch.cat(all_preds).numpy(), alpha=0.5)
-        ax.set_xlabel("True BNP (log)")
-        ax.set_ylabel("Predicted BNP (log)")
-        ax.set_title(f"Epoch {epoch+1}: MAE={avg_val_loss:.4f}, r={val_r:.4f}")
+        ax.scatter(labels_real, preds_real, alpha=0.5, label="Predictions")
+        
+        # --- Fit line (y = m*x + b) in log10 space for stability ---
+        log_true = np.log10(labels_real + 1e-8).reshape(-1, 1)
+        log_pred = np.log10(preds_real + 1e-8)
+        reg = LinearRegression().fit(log_true, log_pred)
+        reg_line = 10 ** reg.predict(log_true)
+        ax.plot(labels_real, reg_line, 'r-', alpha=0.75, label='Regression line')
 
-        plt.savefig(f"outputs/scatter_epoch_{epoch+1}.png")
+        
+        # Reference y = x (perfect prediction)
+        lims = [min(labels_real.min(), preds_real.min()), max(labels_real.max(), preds_real.max())]
+        ax.plot(lims, lims, 'k--', alpha=0.75, label='y=x')
+        
+        # --- Labels, scales, legend ---
+        ax.set_xlabel("Actual NT-proBNP")
+        ax.set_ylabel("Predicted NT-proBNP")
+        ax.set_title("Predicted vs Actual NT-proBNP")
+        ax.legend()
+
+               # --- Log scale ---
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+        
+        # --- Major ticks at powers of 10 ---
+        ax.xaxis.set_major_locator(ticker.LogLocator(base=10.0))
+        ax.yaxis.set_major_locator(ticker.LogLocator(base=10.0))
+        
+        # --- Label only the powers of 10 (10, 100, 1000, etc.) ---
+        ax.xaxis.set_major_formatter(ticker.LogFormatter(base=10.0, labelOnlyBase=True))
+        ax.yaxis.set_major_formatter(ticker.LogFormatter(base=10.0, labelOnlyBase=True))
 
         return avg_val_loss, val_r, fig
 
     def evaluate(self):
         """Evaluate best model on test set and log results + scatter plot."""
         print("🔍 Evaluating best model on test set...")
+    
+        wandb.init(project=self.project, name=f"{self.run_name}-eval", reinit=True)
+    
+        # --- Load best model ---
         self.model.load_state_dict(torch.load("outputs/best_model.pt", map_location=self.device))
         self.model.eval()
-    
+
         test_loss_total = 0.0
         all_preds, all_labels = [], []
     
@@ -163,25 +200,52 @@ class Trainer:
         avg_test_loss = test_loss_total / len(self.test_loader)
         test_r = self._pearson_corr(all_preds, all_labels)
     
-        # --- Create scatter plot ---
-        fig, ax = plt.subplots()
-        ax.scatter(torch.cat(all_labels).numpy(), torch.cat(all_preds).numpy(), alpha=0.5)
-        ax.set_xlabel("True BNP (log)")
-        ax.set_ylabel("Predicted BNP (log)")
-        ax.set_title(f"Test Set: MAE={avg_test_loss:.4f}, r={test_r:.4f}")
-        plt.savefig("outputs/test_scatter.png")
+        preds_log = torch.cat(all_preds).numpy().flatten()
+        labels_log = torch.cat(all_labels).numpy().flatten()
+        preds_real = 10 ** preds_log
+        labels_real = 10 ** labels_log
     
-        # --- Log to W&B ---
+        # --- Scatter plot ---
+        fig, ax = plt.subplots(figsize=(7, 7))
+        ax.scatter(labels_real, preds_real, alpha=0.4, color="steelblue", s=20, label="Predictions")
+    
+        # Regression line (log10 space)
+        log_true = np.log10(labels_real + 1e-8).reshape(-1, 1)
+        log_pred = np.log10(preds_real + 1e-8)
+        reg = LinearRegression().fit(log_true, log_pred)
+        x_range = np.linspace(log_true.min(), log_true.max(), 100).reshape(-1, 1)
+        y_range = reg.predict(x_range)
+        ax.plot(10 ** x_range, 10 ** y_range, color='red', linewidth=2, label='Regression line')
+    
+        # Reference y=x
+        lims = [min(labels_real.min(), preds_real.min()), max(labels_real.max(), preds_real.max())]
+        ax.plot(lims, lims, 'k--', linewidth=1.5, label='Perfect prediction')
+    
+        # Axis setup
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+        ax.xaxis.set_major_locator(ticker.LogLocator(base=10.0))
+        ax.yaxis.set_major_locator(ticker.LogLocator(base=10.0))
+        ax.xaxis.set_major_formatter(ticker.LogFormatter(base=10.0, labelOnlyBase=True))
+        ax.yaxis.set_major_formatter(ticker.LogFormatter(base=10.0, labelOnlyBase=True))
+        ax.set_xlabel("Actual NT-proBNP")
+        ax.set_ylabel("Predicted NT-proBNP")
+        ax.set_title(f"Predicted vs Actual NT-proBNP (r = {test_r:.3f})")
+        ax.legend(frameon=False)
+        ax.grid(True, which="both", ls="--", alpha=0.4)
+        plt.tight_layout()
+    
+        # --- Log results ---
         wandb.log({
             "test_mae": avg_test_loss,
             "test_r": test_r,
             "test_scatter": wandb.Image(fig)
         })
         plt.close(fig)
+        wandb.finish()
     
-        print(f"Test MAE: {avg_test_loss:.4f} | 🔗 Test r: {test_r:.4f}")
+        print(f" Test MAE: {avg_test_loss:.4f} | Test r: {test_r:.4f}")
         return avg_test_loss, test_r
-
 
     def _pearson_corr(self, preds, labels):
         preds = torch.cat(preds).numpy()
