@@ -117,7 +117,7 @@ def main():
     ])
     print('XRayDataset objects created...')
     train_dataset, val_dataset, test_dataset = XRayDataset(X_train, y_train, transform), XRayDataset(X_val, y_val, transform), XRayDataset(X_test, y_test, transform)
-    return train_dataset, val_dataset, test_dataset
+    return train_dataset, val_dataset, test_dataset, y_mean, y_std
 
 if __name__ == "__main__":
     main()

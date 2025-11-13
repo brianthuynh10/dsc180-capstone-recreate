@@ -3,11 +3,11 @@ from src import clean, Trainer
 def main(): 
      # -- Pull Data -- 
     print('Beginning Data Cleaning')
-    train, val, test = clean() # XRayDataset objects
+    train, val, test, y_mean, y_std = clean() # XRayDataset objects
 
     # -- Train Model (using papers setup) -- 
     print('Model created & training will start now')
-    trainer = Trainer(epochs=50, lr=1e-5, batch_size=16, train_dataset = train, val_dataset = val, test_dataset = test)
+    trainer = Trainer(epochs=50, lr=1e-5, batch_size=16, train_dataset = train, val_dataset = val, test_dataset = test, train_mean=y_mean, train_std=y_std)
     trainer.train()
 
     # -- Evaluate Model --

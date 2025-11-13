@@ -1,4 +1,4 @@
-# src/train.py
+import random
 import torch
 from torch import nn, optim
 from torch.utils.data import DataLoader
@@ -13,22 +13,35 @@ import os
 import numpy as np
 from sklearn.linear_model import LinearRegression
 
-
-
 class Trainer:
     def __init__(
         self,
         epochs=50,
         lr=1e-5,
         batch_size=16,
+        train_mean: float=None,
+        train_std: float=None,
         project="vgg16-xray-regression",
         run_name=None,
         device=None,
         train_dataset=None,
         val_dataset=None,
         test_dataset=None,
+        seed=42
         ):
+
+        """Set random seeds for reproducibility."""
+        self.seed = seed
+        torch.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+        np.random.seed(seed)
+        random.seed(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+
         """Initialize trainer, model, optimizer, and wandb run."""
+        self.train_mean = train_mean
+        self.train_std = train_std
         self.model = create_model()
         self.lr = lr
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
@@ -42,8 +55,8 @@ class Trainer:
         self.best_val_loss = float("inf")
         self.project = project
         self.run_name = run_name
-        
-
+        self.seed = seed
+    
         print(f"Using device: {self.device}")
         print(f"Hyperparameters | Epochs: {self.epochs}, LR: {self.lr}, Batch Size: {self.batch_size}")
 
@@ -53,22 +66,39 @@ class Trainer:
         # --- Create output directory ---
         os.makedirs("outputs", exist_ok=True)
 
-        # --- Initialize W&B ---
-        wandb.init(project=self.project, name=self.run_name, config={
-            "epochs": self.epochs,
-            "lr": self.lr,
-            "batch_size": self.batch_size,
-            "optimizer": "Adam",
-            "loss": "MAE"
-        })
-        wandb.watch(self.model, log="all", log_freq=100)
 
     def create_dataloaders(self):
         """Load cleaned data and create dataloaders."""
-        print("Creating Data Loaders...")
-        self.train_loader = DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=4)
-        self.val_loader = DataLoader(self.val_dataset, batch_size=self.batch_size, shuffle=False, num_workers=4)
-        self.test_loader = DataLoader(self.test_dataset, batch_size=self.batch_size, shuffle=False, num_workers=4)
+        # Every DataLoader uses its own generator
+        g = torch.Generator()
+        g.manual_seed(self.seed)
+
+        self.train_loader = DataLoader(
+            self.train_dataset,
+            batch_size=self.batch_size,
+            shuffle=True,
+            num_workers=4,
+            worker_init_fn=lambda worker_id: np.random.seed(self.seed + worker_id),
+            generator=g
+        )
+
+        self.val_loader = DataLoader(
+            self.val_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=4,
+            worker_init_fn=lambda worker_id: np.random.seed(self.seed + worker_id),
+            generator=g
+        )
+
+        self.test_loader = DataLoader(
+            self.test_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=4,
+            worker_init_fn=lambda worker_id: np.random.seed(self.seed + worker_id),
+            generator=g
+        )
 
     def train(self):
         """Main training loop."""
@@ -114,7 +144,6 @@ class Trainer:
                   f"Train MAE: {avg_train_loss:.4f} | Train r: {train_r:.4f} | "
                   f"Val MAE: {avg_val_loss:.4f} | Val r: {val_r:.4f}")
 
-        wandb.finish()
         print("Training complete.")
 
     def validate(self, epoch):
@@ -134,11 +163,18 @@ class Trainer:
         # Convert back to BNPP value, not log
         avg_val_loss = val_loss_total / len(self.val_loader)
         val_r = self._pearson_corr(all_preds, all_labels)
-        preds_log = torch.cat(all_preds).numpy().flatten()
-        labels_log = torch.cat(all_labels).numpy().flatten()
 
-        preds_real = (10 ** preds_log)
-        labels_real = (10 ** labels_log)
+        # standardized values
+        pred_standard = torch.cat(all_preds).numpy().flatten()
+        labels_standard = torch.cat(all_labels).numpy().flatten()
+
+        # undo standardization
+        preds_log = (pred_standard * self.train_std) + self.train_mean
+        labels_log = (labels_standard * self.train_std) + self.train_mean
+        
+        # true scale 
+        preds_real = 10 ** (preds_log-1)
+        labels_real = 10 ** (labels_log-1)
 
         # --- Create scatter plot in original BNP scale ---
         fig, ax = plt.subplots()
@@ -180,8 +216,6 @@ class Trainer:
         """Evaluate best model on test set and log results + scatter plot."""
         print("🔍 Evaluating best model on test set...")
     
-        wandb.init(project=self.project, name=f"{self.run_name}-eval", reinit=True)
-    
         # --- Load best model ---
         self.model.load_state_dict(torch.load("outputs/best_model.pt", map_location=self.device))
         self.model.eval()
@@ -200,11 +234,15 @@ class Trainer:
         avg_test_loss = test_loss_total / len(self.test_loader)
         test_r = self._pearson_corr(all_preds, all_labels)
     
-        preds_log = torch.cat(all_preds).numpy().flatten()
-        labels_log = torch.cat(all_labels).numpy().flatten()
-        preds_real = 10 ** preds_log
-        labels_real = 10 ** labels_log
-    
+        preds_standard = torch.cat(all_preds).numpy().flatten()
+        labels_standard = torch.cat(all_labels).numpy().flatten()
+        # undo standardization
+
+        preds_log = (preds_standard * self.train_std) + self.train_mean
+        labels_log = (labels_standard * self.train_std) + self.train_mean
+
+        preds_real = 10 ** (preds_log-1)
+        labels_real = 10 ** (labels_log-1)  
         # --- Scatter plot ---
         fig, ax = plt.subplots(figsize=(7, 7))
         ax.scatter(labels_real, preds_real, alpha=0.4, color="steelblue", s=20, label="Predictions")
@@ -242,9 +280,8 @@ class Trainer:
             "test_scatter": wandb.Image(fig)
         })
         plt.close(fig)
-        wandb.finish()
     
-        print(f" Test MAE: {avg_test_loss:.4f} | Test r: {test_r:.4f}")
+        print(f"Test MAE: {avg_test_loss:.4f} | Test r: {test_r:.4f}")
         return avg_test_loss, test_r
 
     def _pearson_corr(self, preds, labels):
