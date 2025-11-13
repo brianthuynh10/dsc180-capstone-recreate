@@ -20,6 +20,8 @@ class Trainer:
         epochs=50,
         lr=1e-5,
         batch_size=16,
+        train_mean: float=None,
+        train_std: float=None,
         project="vgg16-xray-regression",
         run_name=None,
         device=None,
@@ -39,6 +41,8 @@ class Trainer:
         torch.backends.cudnn.benchmark = False
 
         """Initialize trainer, model, optimizer, and wandb run."""
+        self.train_mean = train_mean
+        self.train_std = train_std
         self.model = create_model()
         self.lr = lr
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
@@ -160,11 +164,18 @@ class Trainer:
         # Convert back to BNPP value, not log
         avg_val_loss = val_loss_total / len(self.val_loader)
         val_r = self._pearson_corr(all_preds, all_labels)
-        preds_log = torch.cat(all_preds).numpy().flatten()
-        labels_log = torch.cat(all_labels).numpy().flatten()
 
-        preds_real = (10 ** preds_log)
-        labels_real = (10 ** labels_log)
+        # standardized values
+        pred_standard = torch.cat(all_preds).numpy().flatten()
+        labels_standard = torch.cat(all_labels).numpy().flatten()
+
+        # undo standardization
+        preds_log = (pred_standard * self.train_std) + self.train_mean
+        labels_log = (labels_standard * self.train_std) + self.train_mean
+        
+        # true scale 
+        preds_real = 10 ** (preds_log-1)
+        labels_real = 10 ** (labels_log-1)
 
         # --- Create scatter plot in original BNP scale ---
         fig, ax = plt.subplots()
@@ -224,11 +235,15 @@ class Trainer:
         avg_test_loss = test_loss_total / len(self.test_loader)
         test_r = self._pearson_corr(all_preds, all_labels)
     
-        preds_log = torch.cat(all_preds).numpy().flatten()
-        labels_log = torch.cat(all_labels).numpy().flatten()
-        preds_real = 10 ** preds_log
-        labels_real = 10 ** labels_log
-    
+        preds_standard = torch.cat(all_preds).numpy().flatten()
+        labels_standard = torch.cat(all_labels).numpy().flatten()
+        # undo standardization
+
+        preds_log = (preds_standard * self.train_std) + self.train_mean
+        labels_log = (labels_standard * self.train_std) + self.train_mean
+
+        preds_real = 10 ** (preds_log-1)
+        labels_real = 10 ** (labels_log-1)  
         # --- Scatter plot ---
         fig, ax = plt.subplots(figsize=(7, 7))
         ax.scatter(labels_real, preds_real, alpha=0.4, color="steelblue", s=20, label="Predictions")
