@@ -1,45 +1,39 @@
-from src import clean, Trainer
+from src import Trainer, clean
 import wandb
+import torch
 
 def main(): 
     # Initialize W&B (sweep agent injects config here)
     wandb.init(project="vgg16-xray-regression")
 
-    # -- Pull Data -- 
-    print('Beginning Data Cleaning')
-    train, val, test, y_mean, y_std = clean()  # XRayDataset objects
+    # ---- Data Loading ----
+    train, val, test, y_mean, y_std = clean()
+    print("Data loaded successfully.")
 
     # Read hyperparameters from sweep config
-    bs = wandb.config.batch_size
-    lr = wandb.config.lr
+    bs    = wandb.config.batch_size
+    lr    = wandb.config.lr
     epochs = wandb.config.epochs
-    seed = wandb.config.seed
+    seed   = wandb.config.seed
 
-    # -- Create Trainer --
-    print('Model created & training will start now')
-
+    # ---- Trainer ----
     trainer = Trainer(
         epochs=epochs,
-        train_mean=y_mean,
-        train_std=y_std,
         lr=lr,
         batch_size=bs,
         seed=seed,
         train_dataset=train,
         val_dataset=val,
         test_dataset=test,
-        run_name=f"batch-size-{bs}-seed{seed}"
-
+        train_mean=y_mean,
+        train_std=y_std,
+        run_name=f"bs{bs}-seed{seed}"
     )
 
-    # Track gradients & parameters
     wandb.watch(trainer.model, log="all", log_freq=100)
 
-    # Train + evaluate (same run)
     trainer.train()
     trainer.evaluate()
-
-    # End run cleanly
     wandb.finish()
 
 if __name__ == "__main__":

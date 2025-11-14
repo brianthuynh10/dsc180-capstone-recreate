@@ -64,13 +64,11 @@ def main():
     test_data = os.path.join(base_path, 'BNPP_DT_test_with_ages.csv')
 
     # 1: img_keys list
-    print('Clean Data Step 1')
     img_keys = []
     for path in hdf5_paths: 
         grab_keys(path, img_keys)
 
     # 2: read csv files
-    print('Clean Data Step 2')
     train_df, val_df, test_df = pd.read_csv(train_data), pd.read_csv(val_data), pd.read_csv(test_data)
     desired_cols = train_df.columns
 
@@ -81,17 +79,14 @@ def main():
     test_df = test_df[desired_cols].set_index('unique_key')
 
     # 3: find the data we need to keep (originally used when we had little data)
-    print('Clean Data Step 3')
     train_df, val_df, test_df = find_data_from_dataframe(img_keys, train_df, val_df, test_df)
 
     # 4: add image data to dataframe
-    print('Clean Data Step 4')
     train_df = add_image_data_df(train_df, hdf5_paths)
     val_df = add_image_data_df(val_df,hdf5_paths)
     test_df = add_image_data_df(test_df, hdf5_paths)
 
     # 5: convert to numpy arrays
-    print('Clean Data Step 5')
     X_train = np.stack(train_df['img_arr'])
     X_val = np.stack(val_df['img_arr'])
     X_test = np.stack(test_df['img_arr'])
@@ -115,7 +110,6 @@ def main():
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485], std=[0.229])
     ])
-    print('XRayDataset objects created...')
     train_dataset, val_dataset, test_dataset = XRayDataset(X_train, y_train, transform), XRayDataset(X_val, y_val, transform), XRayDataset(X_test, y_test, transform)
     return train_dataset, val_dataset, test_dataset, y_mean, y_std
 
