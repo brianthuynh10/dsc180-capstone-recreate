@@ -31,7 +31,7 @@ def main():
     )
 
     wandb.watch(trainer.model, log="all", log_freq=100)
-
+    
     trainer.train()
     trainer.evaluate()
     wandb.finish()

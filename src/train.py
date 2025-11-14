@@ -1,4 +1,3 @@
-# src/train.py
 import random
 import torch
 from torch import nn, optim
@@ -145,7 +144,7 @@ class Trainer:
                   f"Train MAE: {avg_train_loss:.4f} | Train r: {train_r:.4f} | "
                   f"Val MAE: {avg_val_loss:.4f} | Val r: {val_r:.4f}")
 
-        print("✅ Training complete.")
+        print("Training complete.")
 
     def validate(self, epoch):
         """Run validation and save scatter plot."""
@@ -282,10 +281,8 @@ class Trainer:
         })
         plt.close(fig)
     
-        print(f"✅ Test MAE: {avg_test_loss:.4f} | Test r: {test_r:.4f}")
+        print(f"Test MAE: {avg_test_loss:.4f} | Test r: {test_r:.4f}")
         return avg_test_loss, test_r
-
-
 
     def _pearson_corr(self, preds, labels):
         preds = torch.cat(preds).numpy()
