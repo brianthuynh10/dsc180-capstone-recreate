@@ -104,6 +104,13 @@ class Trainer:
         """Main training loop."""
         self.create_dataloaders()
         print("Beginning training...")
+        wandb.init(project=self.project, name=self.run_name, config={
+            "epochs": self.epochs,
+            "learning_rate": self.lr,
+            "batch_size": self.batch_size,
+            "model": "VGG16",
+            "seed": self.seed
+        })
 
         for epoch in range(self.epochs):
             self.model.train()
