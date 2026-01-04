@@ -1,5 +1,51 @@
-# DSC180 - Quarter 1 Project
-## Setup
+# DSC180 Capstone Project
+## Biomarker-Supervised Deep Learning for Pulmonary Edema Assessment
+
+## Project Overview
+
+This repository contains a multi-quarter capstone project for DSC180 focused on
+biomarker-supervised deep learning for pulmonary edema assessment from chest X-rays.
+
+**Quarter 1** reproduces and evaluates prior work showing that serum biomarkers
+(BNP / NT-proBNP) can be used as continuous training labels for convolutional neural
+networks, reducing reliance on subjective radiologist annotations. We implement a
+reproducible data pipeline, fine-tune ImageNet-pretrained CNNs (VGG variants),
+and evaluate model performance using Pearson correlation and MAE.
+
+**Quarter 2** extends this pipeline by focusing on model interpretability. Building on
+the biomarker-based regression framework, we aim to combine attribution methods
+(e.g., Grad-CAM, saliency maps) with large language models to generate
+clinically grounded, human-readable explanations aligned with radiology-report reasoning.
+
+## Repository Structure
+
+- `src/`  
+  Core Python modules for data preprocessing, dataset construction,
+  model definition, and training.
+
+- `notebooks/part1/`  
+  Exploratory analysis and modeling notebooks used in Quarter 1,
+  including baseline experiments and CNN regression training.
+
+- `notebooks/part2/`  
+  Ongoing and planned notebooks for Quarter 2, focusing on
+  interpretability methods and multimodal explanation generation.
+
+- `reports/part1/`  
+  Quarter 1 submitted report (reproduction and evaluation study).
+
+- `reports/part2/`  
+  Quarter 2 proposal and final report (interpretability extension).
+
+- `main.py`  
+  Entry point for training and running experiments on DSMLP.
+
+- `Dockerfile`, `requirements.txt`  
+  Environment configuration for reproducible execution.
+
+## Setup & Reproducibility (DSMLP)
+The following steps describe how to reproduce training and experiments using the UCSD DSMLP cluster environment.
+
 ### Step 0: Prerequisites
 Make sure you have Docker Desktop install on your computer. If not, install here for [Mac](https://docs.docker.com/desktop/setup/install/mac-install/) or 
 [Windows](https://docs.docker.com/desktop/setup/install/mac-install/](https://docs.docker.com/desktop/setup/install/windows-install/ )
