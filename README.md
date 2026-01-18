@@ -1,5 +1,5 @@
 # DSC180 Capstone Project
-*Biomarker-Supervised Deep Learning for Pulmonary Edema Assessment*
+*Biomarker-Supervised Deep Learning for Pulmonary Edema Assessment from chest X-rays with a focus on interpretability*
 
 ## Project Overview
 
