@@ -17,7 +17,19 @@ RUN pip install \
     wandb \
     scipy \
     h5py \
-    tqdm 
+    tqdm \
+    huggingface \
+    transformers \
+    peft \
+    accelerate \
+    sentencepiece \
+    protobuf \
+    safetensors \
+    bitsandbytes \
+    einops \
+    datasets \
+    rich
+
     
 
 # Set a working directory inside the container
