@@ -1,17 +1,13 @@
 import random
 import torch
-from torch import nn, optim
+from torch import nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from scipy.stats import pearsonr
-import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
 import wandb
 import os
 import numpy as np
-from sklearn.linear_model import LinearRegression
-from models.vgg.models import make_vgg16_model, make_resnet50_model
-from models.vgg.evaluate import Evaluator
+from .models import make_vgg16_model, make_resnet50_model
+from .evaluate import Evaluator
 
 class Trainer:
     def __init__(
@@ -44,6 +40,7 @@ class Trainer:
         # -------------------------
         # Core components
         # -------------------------
+        self.model_name = model_name
         if model_name == "vgg16":
             self.model = make_vgg16_model()
         elif model_name == "resnet50":

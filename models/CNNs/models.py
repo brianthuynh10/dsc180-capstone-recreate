@@ -43,7 +43,6 @@ def make_resnet50_model(out_dim=1, pretrained=True, freeze=False):
     ResNet50 regression model for grayscale X-rays.
     Resolution-agnostic by design.
     """
-
     # --- Load backbone ---
     if pretrained:
         backbone = models.resnet50(

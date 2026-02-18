@@ -1,5 +1,5 @@
-from models.vgg.train import Trainer
-from models.vgg.data import main as clean
+from models.CNNs.train import Trainer
+from models.CNNs.data import main as clean
 
 
 def main(): 

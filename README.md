@@ -20,15 +20,16 @@ clinically grounded, human-readable explanations aligned with radiology-report r
 ## Repository Structure
 
 - `interpretability/`  
-  Folder consisiting of explainability methods implemented that we chose to use for our experiements on CNNs of LLMs
+  Folder consisiting of explainability methods implemented that we chose to use for our experiements on CNNs and LLMs
+    *`/GradCAM` contains scripts that uses the GradCAM package APIs to help find gradients at selected layers and create visual heatmaps overlaid on a sample image
+    *`/imageOcclusion` helps predict log-BNPP values on ablated images and a `AblatedBNPPDataset` to help put into a pytorch data loader
 
 - `notebooks/part1/`  
   Exploratory analysis and modeling notebooks used in Quarter 1,
   including baseline experiments and CNN regression training.
 
 - `notebooks/part2/`  
-  Ongoing and planned notebooks for Quarter 2, focusing on
-  interpretability methods and multimodal explanation generation.
+  Used for analysis an experiementing with LLMs, also used for creating our visualizations incorporated into our presentation poster. 
 
 - `reports/part1/`  
   Quarter 1 submitted report (reproduction and evaluation study).
@@ -40,7 +41,10 @@ clinically grounded, human-readable explanations aligned with radiology-report r
   Models we used for our explainability experiments. Broken into `/MediPhi` and `/CNNs` - where `/MediPhi` contains scripts to help assemble the fine-tuned model and generate labels for an inputted reports. `CNNs` consists of scripts to preprocess image data and train ResNet50 or VGG16 models. 
 
 - `scripts/` 
-  Scripts for running the fine-tuned MediPhi model or start training ResNet50 or VGG16. 
+  Scripts used for running our models and explainability methods. More details of each script will be located in the README.md in this folder. To run a script,
+  ```
+  python3 -m scripts.<SCRIPT_NAME> # DO NOT INCLUDE .py!
+  ```
 
 - `Dockerfile`, `requirements.txt`  
   Environment configuration for reproducible execution.

@@ -1,6 +1,6 @@
 from interpretability.GradCAM.data import create_groups
 from interpretability.GradCAM.GradCAM import GradCAMWrapper
-from models.CNNs.assembleCNN import build_grayscale_cnn, load_model
+from models.CNNs.assembleCNN import build_grayscale_cnn
 from interpretability.GradCAM.BNPPDataset import BNPPDataset
 import os 
 from torch.utils.data import DataLoader
@@ -46,7 +46,6 @@ def main():
     full_reports['hdf5_file_name'] = full_reports['hdf5_file_name'].apply(ast.literal_eval)
 
     model = build_grayscale_cnn(model_name="resnet50")
-    model = load_model(model)
     grouped_dict = create_groups(full_reports)
 
     print('Phase 1 Done')
